@@ -1,0 +1,13 @@
+# 运行时产物
+*.log
+*.png
+*.jpg
+*.bmp
+__pycache__/
+*.pyc
+
+# 编辑器/系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
