@@ -185,6 +185,12 @@ $form.Add_Paint({
     }
     $scan.Dispose()
 
+    # 右上状态：跟随中亮块 / 固定时暗块
+    $st = if ($script:followMode) { $CLR_MAIN } else { [System.Drawing.Color]::FromArgb(60, 70, 90) }
+    $stBrush = New-Object System.Drawing.SolidBrush($st)
+    $g.FillRectangle($stBrush, $W - 12, 8, 4, 4)
+    $stBrush.Dispose()
+
     # 左上运行指示方块（呼吸）
     $blinkOn = ([DateTime]::Now.Millisecond % 1000) -lt 700
     if ($blinkOn) {
@@ -194,6 +200,7 @@ $form.Add_Paint({
 
 $script:f8prev = $false
 $script:f9prev = $false
+$script:f10prev = $false
 
 # 用采集器 computer.mouse_click 的同款实现点一下当前鼠标位置
 function Try-ClickHere {
@@ -218,8 +225,10 @@ function Copy-Coords {
 # 跟随中的窗口移动会干扰 SetCursorPos 的连续调用（实测会让采集器点击落点跑偏），
 # 所以「移动时不跟随、停下才跟随」，既满足看坐标的需求，也不干扰点击。
 $script:stillTicks = 0
-$script:STILL_NEED = 8        # 8 x 40ms = 320ms 静止（仅 -Follow 模式使用）
-$script:followMode = [bool]$Follow
+# 静止阈值：600ms。程序化点击（SetCursorPos 后停留通常 <120ms）不会触发窗口移动，
+# 因此跟随不会干扰采集器的点击落点；人读坐标时停下片刻窗口就会跟过来。
+$script:STILL_NEED = 15
+$script:followMode = if ($PSBoundParameters.ContainsKey('Follow')) { [bool]$Follow } else { $true }
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 40
@@ -251,6 +260,16 @@ $timer.Add_Tick({
         Try-ClickHere
     }
     $script:f8prev = $f8
+
+    # ---- F10: 切换跟随 / 固定 ----
+    $f10 = ([InputSim]::GetAsyncKeyState(0x79) -band 0x8000) -ne 0
+    if ($f10 -and -not $script:f10prev) {
+        $script:followMode = -not $script:followMode
+        $script:stillTicks = 0
+        $script:flashUntil = [DateTime]::Now.AddMilliseconds(260)
+        $form.Invalidate()
+    }
+    $script:f10prev = $f10
 
     # ---- F9: 复制当前坐标 ----
     $f9 = ([InputSim]::GetAsyncKeyState(0x78) -band 0x8000) -ne 0
